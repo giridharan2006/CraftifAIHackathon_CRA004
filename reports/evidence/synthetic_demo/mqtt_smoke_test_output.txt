@@ -1,0 +1,24 @@
+### opt_13_final_mqtt_smoke
+# time: 2026-10-16T22:17:26+05:30
+# cwd:  /home/giridharan-s/Downloads/workplace_safety_sentinel
+$ MOSQUITTO_PREFIX=/tmp/claude-1000/-home-giridharan-s-Downloads-workplace-safety-sentinel/de1640b2-da1a-4494-b684-63dc0b0471d8/scratchpad/mosq/root bash scripts/mqtt_smoke_test.sh 2>&1
+broker: mosquitto version 2.0.18 on 127.0.0.1:18830
+2026-10-16 22:17:28,506 INFO sentinel.mqtt: MQTT connected to 127.0.0.1:18830, topic workplace_safety/alerts
+2026-10-16 22:17:28,506 INFO sentinel: zones: ['restricted_zone_1'] | format: generic | incidents -> data/synthetic/mqtt_smoke/incidents_synthetic.jsonl
+2026-10-16 22:17:28,509 WARNING sentinel: ALERT incident_0001: person track 1 entered restricted_zone_1 (conf=0.88)
+2026-10-16 22:17:29,510 INFO sentinel: done: 80 frames, 160 person detections, 1 incidents, 2 unique tracks, 0 malformed
+--- broker log
+1792169246: mosquitto version 2.0.18 starting
+1792169246: Config loaded from /tmp/tmp.x5jjzw69Ql/mosquitto.conf.
+1792169246: Opening ipv4 listen socket on port 18830.
+1792169246: mosquitto version 2.0.18 running
+1792169247: New connection from 127.0.0.1:44046 on port 18830.
+1792169247: New client connected from 127.0.0.1:44046 as auto-2E06ABD0-D4A7-18CB-EA28-91F4C4E5793D (p2, c1, k60).
+1792169248: New connection from 127.0.0.1:42491 on port 18830.
+1792169248: New client connected from 127.0.0.1:42491 as workplace-safety-sentinel (p2, c1, k30).
+1792169248: Client auto-2E06ABD0-D4A7-18CB-EA28-91F4C4E5793D disconnected.
+1792169249: Client workplace-safety-sentinel disconnected.
+--- received by mosquitto_sub (reports/evidence/synthetic_demo/mqtt_subscriber_received.txt)
+workplace_safety/alerts {"event_id": "incident_0001", "event_type": "restricted_zone_intrusion", "object_class": "person", "zone_id": "restricted_zone_1", "timestamp": "2026-01-01T00:00:05.100000+00:00", "confidence": 0.88, "alert": true, "track_id": 1, "source_id": 0, "frame": 51, "anchor_point": {"x": 0.6187, "y": 0.7222}, "bbox_norm": [0.5823, 0.3519, 0.6552, 0.7222], "dedup_method": "track", "input_format": "generic", "processed_at": "2026-10-16T16:47:28.508+00:00"}
+PASS: MQTT payload equals the JSONL record (incident_0001, track 1, frame 51) [SYNTHETIC input]
+# exit: 0

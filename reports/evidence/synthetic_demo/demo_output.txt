@@ -1,0 +1,24 @@
+### opt_11_final_synthetic_demo
+# time: 2026-10-16T22:17:26+05:30
+# cwd:  /home/giridharan-s/Downloads/workplace_safety_sentinel
+$ bash scripts/run_synthetic_demo.sh 2>&1
+wrote 80 SYNTHETIC frames to data/synthetic/metadata_synthetic.jsonl
+2026-10-16 22:17:26,163 INFO sentinel: zones: ['restricted_zone_1'] | format: generic | incidents -> data/synthetic/incidents_synthetic.jsonl
+2026-10-16 22:17:26,165 WARNING sentinel: ALERT incident_0001: person track 1 entered restricted_zone_1 (conf=0.88)
+2026-10-16 22:17:26,166 INFO sentinel: done: 80 frames, 160 person detections, 1 incidents, 2 unique tracks, 0 malformed
+--- SYNTHETIC incidents:
+{"event_id":"incident_0001","event_type":"restricted_zone_intrusion","object_class":"person","zone_id":"restricted_zone_1","timestamp":"2026-01-01T00:00:05.100000+00:00","confidence":0.88,"alert":true,"track_id":1,"source_id":0,"frame":51,"anchor_point":{"x":0.6187,"y":0.7222},"bbox_norm":[0.5823,0.3519,0.6552,0.7222],"dedup_method":"track","input_format":"generic","processed_at":"2026-10-16T16:47:26.165+00:00"}
+--- SYNTHETIC stats:
+{
+  "frames_processed": 80,
+  "total_detections": 160,
+  "current_people": 2,
+  "unique_tracked_people": 2,
+  "incidents_total": 1,
+  "incidents_by_zone": {
+    "restricted_zone_1": 1
+  },
+  "last_incident_timestamp": "2026-01-01T00:00:05.100000+00:00",
+  "malformed_records": 0
+}
+# exit: 0

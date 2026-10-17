@@ -1,0 +1,173 @@
+# Environment report - 2026-10-16T16:47:44Z - host giridharan-s-LOQ-15IRX10
+## OS / CPU
+$ uname -a
+Linux giridharan-s-LOQ-15IRX10 7.0.0-34-generic #34~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Sep  4 15:38:29 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+[exit 0]
+
+$ uname -m
+x86_64
+[exit 0]
+
+$ cat /etc/os-release | head -4
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+[exit 0]
+
+$ cat /etc/nv_tegra_release
+cat: /etc/nv_tegra_release: No such file or directory
+[exit 1]
+
+## Display
+XDG_SESSION_TYPE=wayland DISPLAY=:0
+
+## NVIDIA GPU / driver
+$ nvidia-smi
+bash: line 1: nvidia-smi: command not found
+[exit 127]
+
+$ ls /dev/nvidia* 2>/dev/null
+[exit 2]
+
+$ lspci -nnk | grep -iA3 'nvidia' | grep -iE 'nvidia|driver in use'
+01:00.0 VGA compatible controller [0300]: NVIDIA Corporation Device [10de:2d59] (rev a1)
+	Kernel driver in use: nouveau
+	Kernel modules: nvidiafb, nouveau
+01:00.1 Audio device [0403]: NVIDIA Corporation Device [10de:22eb] (rev a1)
+	Subsystem: NVIDIA Corporation Device [10de:0000]
+	Kernel driver in use: snd_hda_intel
+[exit 0]
+
+$ cat /proc/driver/nvidia/version
+cat: /proc/driver/nvidia/version: No such file or directory
+[exit 1]
+
+## Container runtime (PipeGen v0.5.1 runs DeepStream in a Docker image; prerequisites script installs these)
+$ docker --version
+bash: line 1: docker: command not found
+[exit 127]
+
+$ nvidia-ctk --version
+bash: line 1: nvidia-ctk: command not found
+[exit 127]
+
+$ id -nG | tr ' ' '\n' | grep -x docker
+[exit 1]
+
+$ docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | head
+bash: line 1: docker: command not found
+[exit 0]
+
+## CUDA
+$ nvcc --version
+bash: line 1: nvcc: command not found
+[exit 127]
+
+$ ls -d /usr/local/cuda*
+ls: cannot access '/usr/local/cuda*': No such file or directory
+[exit 2]
+
+## TensorRT
+$ which trtexec || ls /usr/src/tensorrt/bin/trtexec
+ls: cannot access '/usr/src/tensorrt/bin/trtexec': No such file or directory
+[exit 2]
+
+$ dpkg -l | grep -iE 'tensorrt|nvinfer' | head
+[exit 0]
+
+$ python3 -c 'import tensorrt; print(tensorrt.__version__)'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'tensorrt'
+[exit 1]
+
+## DeepStream
+$ deepstream-app --version-all
+bash: line 1: deepstream-app: command not found
+[exit 127]
+
+$ ls /opt/nvidia/deepstream/
+ls: cannot access '/opt/nvidia/deepstream/': No such file or directory
+[exit 2]
+
+$ ls /opt/nvidia/deepstream/deepstream/samples/streams/
+ls: cannot access '/opt/nvidia/deepstream/deepstream/samples/streams/': No such file or directory
+[exit 2]
+
+$ gst-inspect-1.0 nvinfer | head -5
+No such element or plugin 'nvinfer'
+[exit 0]
+
+$ gst-inspect-1.0 nvtracker | head -5
+No such element or plugin 'nvtracker'
+[exit 0]
+
+## PipeGen
+$ which pipegen
+[exit 1]
+
+$ pipegen --version
+bash: line 1: pipegen: command not found
+[exit 127]
+
+$ pipegen --help
+bash: line 1: pipegen: command not found
+[exit 127]
+
+$ pip list 2>/dev/null | grep -iE 'pipegen|craftif'
+[exit 1]
+
+## Camera
+$ ls -l /dev/video*
+crw-rw----+ 1 root video 81, 0 Oct 15 21:36 /dev/video0
+crw-rw----+ 1 root video 81, 1 Oct 15 21:36 /dev/video1
+[exit 0]
+
+$ v4l2-ctl --list-devices
+Integrated Camera: Integrated C (usb-0000:00:14.0-6):
+	/dev/video0
+	/dev/video1
+	/dev/media0
+
+[exit 0]
+
+## Python
+$ which python3; python3 --version
+/usr/bin/python3
+Python 3.12.3
+[exit 0]
+
+$ python3 -c 'import yaml, paho.mqtt; print("yaml ok, paho", paho.mqtt.__version__)'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'paho'
+[exit 1]
+
+## MQTT broker
+$ which mosquitto mosquitto_sub mosquitto_pub
+[exit 1]
+
+## Disk / memory
+$ df -h "/home/giridharan-s/Downloads/workplace_safety_sentinel"
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p6  295G   49G  231G  18% /
+[exit 0]
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       8.3Gi       2.3Gi       1.3Gi       6.0Gi       7.0Gi
+Swap:          4.0Gi       1.8Mi       4.0Gi
+[exit 0]
+
+## Official Track A setup checklist (problem statement)
+  [FAIL] NVIDIA GPU present on PCI but no NVIDIA driver loaded (driver in use: nouveau); install the proprietary driver
+  [PASS] arch x86_64
+  [FAIL] pipegen --version should print 0.5.1 (got: not installed)
+  [FAIL] XDG_SESSION_TYPE=wayland (PipeGen needs an X11 desktop session)
+  [PASS] camera device(s): /dev/video0 /dev/video1 
+  [FAIL] docker not found (run PipeGen's pipegen_prerequisites_ubuntu_x86.sh)
+  [FAIL] nvidia-ctk not found (run PipeGen's pipegen_prerequisites_ubuntu_x86.sh)
+  [FAIL] user not in docker group (log out/in after the prerequisites script)
+  [INFO] no host deepstream-app (expected: PipeGen v0.5.1 uses DeepStream inside its container image)
+  [PASS] project under /home

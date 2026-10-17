@@ -1,0 +1,158 @@
+TEST RESULTS (first session) — Workplace Safety Sentinel — target laptop — 2026-10-16T21:57:39+05:30
+Interpreter: .venv/bin/python (Python 3.12.3), PYTHONPATH unset. Unit tests cover the incident-processing
+component only. They do NOT test PipeGen, TensorRT, DeepStream, or live video.
+
+SUPERSEDED COUNTS: after the optimisation pass the suite has 96 tests, all passing
+(raw/opt_10_final_pytest.log; details in docs/OPTIMIZATION_REPORT.md section 5).
+
+1. Initial run (before any change): 36 passed            raw/test_01_pytest_initial.log
+2. New tests/test_run_pipeline.py: first run 1 passed, 1 FAILED (wrong expected frame in MY test;
+   processor correct) -> expectation fixed -> 2 passed   raw/test_02_*.log, raw/test_02b_*.log
+3. Regression proof: original run_pipeline.sh logic exits 1 silently without export dir
+                                                          raw/test_02c_regression_check_old_logic.log
+4. Full suite after changes: 41 passed                   raw/test_03_full_suite.log
+5. FINAL full suite: see below                           raw/final_01_pytest.log
+
+Synthetic demo (synthetic metadata, NOT model output):
+   scripts/run_synthetic_demo.sh exit 0; verify_synthetic_demo.py 16/16 PASS   raw/final_02_*.log, raw/final_03_*.log
+MQTT (synthetic input): real mosquitto 2.0.18 broker + mosquitto_sub received the alert; payload == JSONL record
+                                                          raw/synth_04_mqtt_local_broker.log
+MQTT broker down: processor warns, disables MQTT, still writes JSONL       raw/synth_03_mqtt_no_broker.log
+run_pipeline.sh with STUB pipeline (synthetic): exit 0, 1 incident, logs in synthetic evidence dir
+                                                          raw/plumb_02_run_pipeline_stub.log
+
+================ FINAL pytest output ================
+### final_01_pytest
+# time: 2026-10-16T21:57:03+05:30
+# cwd:  /home/giridharan-s/Downloads/workplace_safety_sentinel
+$ env -u PYTHONPATH PATH=/home/giridharan-s/Downloads/workplace_safety_sentinel/.venv/bin:$PATH python3 -m pytest -q -rA 2>&1
+.........................................                                [100%]
+==================================== PASSES ====================================
+____________ test_tracked_person_entering_zone_creates_one_incident ____________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person track 1 entered restricted_zone_1 (conf=0.9)
+_____________________________ test_class_id_match ______________________________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person track 1 entered restricted_zone_1 (conf=0.9)
+_______________ test_untracked_duplicates_suppressed_by_cooldown _______________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person entered restricted_zone_1 (conf=0.9)
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0002: person entered restricted_zone_1 (conf=0.9)
+_____________________ test_boundary_flicker_does_not_spam ______________________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person track 9 entered restricted_zone_1 (conf=0.9)
+_________________ test_reentry_after_cooldown_is_new_incident __________________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person track 5 entered restricted_zone_1 (conf=0.9)
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0002: person track 5 entered restricted_zone_1 (conf=0.9)
+____________________ test_two_people_tracked_independently _____________________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person track 1 entered restricted_zone_1 (conf=0.9)
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0002: person track 2 entered restricted_zone_1 (conf=0.9)
+____________________ test_missing_optional_metadata_is_safe ____________________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person entered restricted_zone_1 (conf=None)
+_____________________ test_event_ids_continue_across_runs ______________________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person entered restricted_zone_1 (conf=0.9)
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0002: person entered restricted_zone_1 (conf=0.9)
+___________________ test_cli_end_to_end_with_malformed_line ____________________
+------------------------------ Captured log call -------------------------------
+WARNING  sentinel:incident_processor.py:194 skipping malformed record #1: invalid JSON: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+WARNING  sentinel:incident_processor.py:181 ALERT incident_0001: person track 1 entered restricted_zone_1 (conf=0.77)
+_________________ test_cli_missing_input_file_fails_gracefully _________________
+------------------------------ Captured log call -------------------------------
+ERROR    sentinel:incident_processor.py:284 metadata file not found: /tmp/pytest-of-giridharan-s/pytest-5/test_cli_missing_input_file_fa0/nope.jsonl
+=========================== short test summary info ============================
+PASSED tests/test_event_logger.py::test_creates_missing_directory
+PASSED tests/test_event_logger.py::test_records_are_valid_json_lines
+PASSED tests/test_event_logger.py::test_multiple_events_appended
+PASSED tests/test_event_logger.py::test_statistics_counts
+PASSED tests/test_event_logger.py::test_statistics_save
+PASSED tests/test_incident_processor.py::test_tracked_person_entering_zone_creates_one_incident
+PASSED tests/test_incident_processor.py::test_object_outside_zone_no_alert
+PASSED tests/test_incident_processor.py::test_non_person_in_zone_no_alert
+PASSED tests/test_incident_processor.py::test_low_confidence_ignored
+PASSED tests/test_incident_processor.py::test_class_id_match
+PASSED tests/test_incident_processor.py::test_untracked_duplicates_suppressed_by_cooldown
+PASSED tests/test_incident_processor.py::test_boundary_flicker_does_not_spam
+PASSED tests/test_incident_processor.py::test_reentry_after_cooldown_is_new_incident
+PASSED tests/test_incident_processor.py::test_two_people_tracked_independently
+PASSED tests/test_incident_processor.py::test_missing_optional_metadata_is_safe
+PASSED tests/test_incident_processor.py::test_event_ids_continue_across_runs
+PASSED tests/test_incident_processor.py::test_parse_generic_pixel_bbox
+PASSED tests/test_incident_processor.py::test_parse_generic_skips_bad_objects_keeps_good
+PASSED tests/test_incident_processor.py::test_parse_deepstream_minimal
+PASSED tests/test_incident_processor.py::test_malformed_records_raise_metadata_error[{not json]
+PASSED tests/test_incident_processor.py::test_malformed_records_raise_metadata_error[[1,2]]
+PASSED tests/test_incident_processor.py::test_malformed_records_raise_metadata_error[{"objects": "x"}]
+PASSED tests/test_incident_processor.py::test_cli_end_to_end_with_malformed_line
+PASSED tests/test_incident_processor.py::test_cli_missing_input_file_fails_gracefully
+PASSED tests/test_incident_processor.py::test_config_validation
+PASSED tests/test_inspect_metadata.py::test_detects_generic
+PASSED tests/test_inspect_metadata.py::test_detects_deepstream_minimal_and_flags_frame_size
+PASSED tests/test_inspect_metadata.py::test_unknown_schema_fails
+PASSED tests/test_run_pipeline.py::test_missing_export_reports_reason
+PASSED tests/test_run_pipeline.py::test_stub_pipeline_feeds_processor_in_follow_mode
+PASSED tests/test_zone_manager.py::test_point_clearly_outside
+PASSED tests/test_zone_manager.py::test_point_clearly_inside
+PASSED tests/test_zone_manager.py::test_point_on_boundary_counts_as_inside
+PASSED tests/test_zone_manager.py::test_invalid_zone_coordinates_rejected[coords0]
+PASSED tests/test_zone_manager.py::test_invalid_zone_coordinates_rejected[coords1]
+PASSED tests/test_zone_manager.py::test_invalid_zone_coordinates_rejected[coords2]
+PASSED tests/test_zone_manager.py::test_invalid_zone_coordinates_rejected[coords3]
+PASSED tests/test_zone_manager.py::test_invalid_zone_coordinates_rejected[coords4]
+PASSED tests/test_zone_manager.py::test_missing_coordinate_in_config
+PASSED tests/test_zone_manager.py::test_bottom_center_anchor_feet_outside_head_inside
+PASSED tests/test_zone_manager.py::test_to_pixels
+41 passed in 2.61s
+# exit: 0
+
+================ FINAL synthetic verification ================
+### final_03_verify_synthetic
+# time: 2026-10-16T21:57:06+05:30
+# cwd:  /home/giridharan-s/Downloads/workplace_safety_sentinel
+$ env -u PYTHONPATH PATH=/home/giridharan-s/Downloads/workplace_safety_sentinel/.venv/bin:$PATH python3 scripts/verify_synthetic_demo.py
+[PASS] all 80 metadata frames are flagged synthetic
+[PASS] incidents_synthetic.jsonl: 1 line(s), all valid JSON
+[PASS] only track 1 ever has its feet inside the zone (tracks inside: ['1'])
+[PASS] track 1 enters at frame 49 and stays inside for 31 frames
+[PASS] exactly one incident although track 1 stays inside for many frames (dedup)
+[PASS] incident belongs to track 1 (the person who entered)
+[PASS] incident fires on frame 51 = entry + confirm_frames(3) - 1 (got 51)
+[PASS] record type/class correct
+[PASS] track 2 (outside the zone) produced no incident
+[PASS] forklift feet at (0.781,0.694) are inside the zone yet produced no incident (non-person filtered)
+[PASS] stats.frames_processed == 80
+[PASS] stats.total_detections == 160 person detections (forklift excluded)
+[PASS] stats.unique_tracked_people == 2
+[PASS] stats.incidents_total matches the JSONL
+[PASS] stats.malformed_records == 0
+[PASS] live log data/incidents.jsonl untouched by the synthetic demo
+SYNTHETIC demo verification: 16/16 checks passed
+# exit: 0
+
+================ FINAL validate_project.sh ================
+### final_04_validate_project
+# time: 2026-10-16T21:57:06+05:30
+# cwd:  /home/giridharan-s/Downloads/workplace_safety_sentinel
+$ env -u PYTHONPATH PATH=/home/giridharan-s/Downloads/workplace_safety_sentinel/.venv/bin:$PATH bash scripts/validate_project.sh
+== Unit tests
+.........................................                                [100%]
+41 passed in 2.62s
+== Config
+  settings.yaml valid; zones: ['restricted_zone_1']
+== PipeGen v0.5.1: NOT INSTALLED
+== PipeGen evidence (reports/evidence/pipegen, pipegen_project/)
+  [NOT VERIFIED] 1 Requirement                          draft in pipegen_project/requirement.md; export PipeGen's copy to reports/evidence/pipegen/
+  [NOT VERIFIED] 2 Pipeline IR                          no IR artifact found
+  [NOT VERIFIED] 3 Model                                no model/label file found
+  [NOT VERIFIED] 4 TensorRT engine                      no *.engine found
+  [NOT VERIFIED] 4 Speed report                         no speed report in reports/evidence/pipegen/
+  [NOT VERIFIED] 5 PipeGen export (run.sh)              export the PipeGen project to pipegen_project/export/
+  [NOT VERIFIED] 5 Run (pipeline log)                   run scripts/run_pipeline.sh on the GPU machine
+== Actionable output
+  [NOT VERIFIED] Live incidents                         data/incidents.jsonl empty/absent
+  [COMPLETE]     MQTT (component, synthetic input)      reports/evidence/synthetic_demo/mqtt_subscriber_received_laptop.txt
+  [NOT VERIFIED] MQTT (live pipeline)                   not captured
+# exit: 0

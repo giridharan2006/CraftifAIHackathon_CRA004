@@ -1,0 +1,33 @@
+PipeGen official installation guide — verbatim text from the CraftifAI developer portal
+Source: https://developer.craftifai.com/ (Downloads > PipeGen; text taken from the site's
+JavaScript bundle /assets/index-CaR7we_I.js, fetched 2026-10-16). Downloads require a signed-in
+browser session; the files themselves were NOT downloaded.
+Editing: the source writes the package version as a variable (${Kn}); it is shown here as the
+listed version 0.5.1. Everything else is verbatim, including the portal's own "0.3.0" .tar.gz example.
+
+Listed PipeGen version: 0.5.1
+Download endpoints: /download/pipegen/linux-x86_64-deb, /download/pipegen/linux-x86_64-targz, /download/pipegen/linux-aarch64-deb, /download/pipegen/linux-aarch64-targz, /download/pipegen/prereqs-ubuntu-x86
+
+== Setup & Installation: Linux x86_64
+1. Run setup script: Run the automated setup script to install all required dependencies. In your Downloads folder, run: `chmod +x ./pipegen_prerequisites_ubuntu_x86.sh` then `./pipegen_prerequisites_ubuntu_x86.sh`. This takes approximately 5 to 10 minutes depending on your internet speed. It installs Docker, the NVIDIA Container Toolkit and socat, and adds your user to the docker group — log out and back in once it finishes, or the group membership will not apply.
+2. Install PipeGen: Install PipeGen using the APT package: `sudo apt install ./PipeGen_0.5.1_amd64.deb`
+3. First launch: On first launch, PipeGen downloads the DeepStream container image automatically: around 12 GB over the network, about 35 GB on disk once unpacked. Allow time for it. If the download drops, run `pipegen` again and it resumes from the layers that already finished. Later runs reuse the image and start in seconds.
+4. Launch PipeGen: Launch PipeGen from your system application menu, or run `pipegen` in a terminal window.
+5. Create your account: Sign up with your email and password. Verify the code sent to your email, then sign in with the same credentials.
+
+== Setup & Installation: Jetson
+1. Install socat: Run: `sudo apt install socat`
+2. Configure Docker group: Run: `sudo usermod -aG docker $USER` then `newgrp docker`. Restart your session to apply changes.
+3. Install PipeGen: Install PipeGen using the APT package: `sudo apt install ./PipeGen_0.5.1_arm64.deb`
+4. First launch: On first launch, PipeGen downloads the DeepStream container image automatically: around 12 GB over the network. Allow time for it. If the download drops, run `pipegen` again and it resumes from the layers that already finished. Later runs reuse the image and start in seconds.
+5. Launch PipeGen: Launch PipeGen from your system application menu, or run `pipegen` in a terminal window.
+6. Create your account: Sign up with your email and password. Verify the code sent to your email, then sign in with the same credentials.
+
+== Download card setup steps (Linux .deb x86_64)
+- Download the package matching your architecture: x86_64 for Intel/AMD, aarch64 for ARM.
+- Debian/Ubuntu on Linux x86_64 Intel/AMD: install with `sudo apt install ./PipeGen_0.5.1_amd64.deb`. If it reports missing dependencies, run `sudo apt-get -f install`.
+- Other distros (.tar.gz): extract with `tar -xzf PipeGen_0.3.0_<arch>.tar.gz`, then run the launcher from the extracted folder.
+- Launch PipeGen and sign in with your CraftifAI credentials.
+
+Note: the guide does not cover the NVIDIA GPU driver; the prerequisites script installs
+Docker, the NVIDIA Container Toolkit and socat only.

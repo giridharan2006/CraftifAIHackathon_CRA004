@@ -1,0 +1,22 @@
+### opt_12_final_verify
+# time: 2026-10-16T22:17:26+05:30
+# cwd:  /home/giridharan-s/Downloads/workplace_safety_sentinel
+$ env -u PYTHONPATH .venv/bin/python scripts/verify_synthetic_demo.py
+[PASS] all 80 metadata frames are flagged synthetic
+[PASS] incidents_synthetic.jsonl: 1 line(s), all valid JSON
+[PASS] only track 1 ever has its feet inside the zone (tracks inside: ['1'])
+[PASS] track 1 enters at frame 49 and stays inside for 31 frames
+[PASS] exactly one incident although track 1 stays inside for many frames (dedup)
+[PASS] incident belongs to track 1 (the person who entered)
+[PASS] incident fires on frame 51 = entry + confirm_frames(3) - 1 (got 51)
+[PASS] record type/class correct
+[PASS] track 2 (outside the zone) produced no incident
+[PASS] forklift feet at (0.781,0.694) are inside the zone yet produced no incident (non-person filtered)
+[PASS] stats.frames_processed == 80
+[PASS] stats.total_detections == 160 person detections (forklift excluded)
+[PASS] stats.unique_tracked_people == 2
+[PASS] stats.incidents_total matches the JSONL
+[PASS] stats.malformed_records == 0
+[PASS] live log data/incidents.jsonl untouched by the synthetic demo
+SYNTHETIC demo verification: 16/16 checks passed
+# exit: 0
