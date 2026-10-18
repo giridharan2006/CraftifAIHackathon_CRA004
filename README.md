@@ -2,179 +2,44 @@
 
 **See the danger. Detect the violation. Trigger the alert.**
 
-An edge-AI safety monitor for the *Embedded SF: CraftifAI Physical AI Hackathon*,
-**Track A: PipeGen (Perception)**, suggested problem #1. A CraftifAI PipeGen
-pipeline detects and tracks people on a site camera. This repository turns that
-pipeline's detection metadata into **restricted-zone intrusion alerts**: a JSON
-Lines incident log, run statistics, and MQTT messages.
+An edge-AI safety monitor for the **Embedded SF: CraftifAI Physical AI Hackathon**, Track A: PipeGen (Perception), suggested problem #1. A CraftifAI PipeGen pipeline detects and tracks people on a site camera. This repository turns that pipeline's detection metadata into restricted-zone intrusion alerts: a JSON Lines incident log, run statistics, and MQTT messages.
 
-Team Members:
-Yash
-S.Giridharan
-Aadesh SJ
-Aditya
-> **Status in one line:** the incident-processing side is implemented and tested
-> (96 automated tests, synthetic end-to-end replay, real MQTT delivery). The
-> **PipeGen / TensorRT / GPU stages have not been run yet**. On the target laptop
-> they are blocked by the missing NVIDIA driver, PipeGen installation, and X11
-> session. See [Implementation status](#13-current-implementation-status).
+**Team Members:** Yash S. · Giridharan · Aadesh SJ · Aditya
 
-## 1. Overview
-| Layer | Runs on | Implemented by |
-| --- | --- | --- |
-| Perception: camera → person detector (TensorRT) → tracker → metadata | NVIDIA GPU / Jetson | **PipeGen-generated DeepStream app** (`pipegen_project/`) |
-| Decision: person filter, zone test, de-duplication, statistics | CPU | `src/incident_processor.py` |
-| Action: JSONL incident log, MQTT alert | CPU | `src/event_logger.py`, `src/mqtt_publisher.py` |
+| Submission checklist | Status | Where |
+|---|---|---|
+| Repository is public | ✅ Done | — |
+| README shows it running | ✅ Incident processor, synthetic end-to-end replay, MQTT delivery · ⏳ live PipeGen run pending | [§1 See it running](#1-see-it-running) |
+| Pipeline IR node graph screenshot | ⏳ Pending: generated in PipeGen Stage 2 | [§2 Pipeline IR node graph](#2-pipeline-ir-node-graph) |
+| PipeGen Export Project folder | ⏳ Pending: goes in `pipegen_project/export/` | [§3 PipeGen export](#3-pipegen-export-project) |
+| README says how to run it | ✅ Done | [§4 Quick start](#4-quick-start) |
 
-The Python code does **no inference**. All perception comes from PipeGen.
+> **Status in one line:** the incident-processing side is implemented and tested (96 automated tests, synthetic end-to-end replay, real MQTT delivery). The PipeGen / TensorRT / GPU stages have not been run yet. On the target laptop they are blocked by the missing NVIDIA driver, PipeGen installation, and X11 session. See [§13](#13-current-implementation-status).
 
-## 2. Problem
-Workers walk into robot cells, press lines, or chemical benches without anyone
-noticing. CCTV is passive: violations surface only after an incident.
+---
 
-## 3. Solution
-A PipeGen pipeline detects and tracks people. For every tracked person, the incident
-processor takes the bottom-centre of the bounding box (an approximation of where
-the feet touch the floor). It tests that point against configurable restricted
-zones. It raises **one** alert per entry, confirmed over several frames and
-de-duplicated per track, to `data/incidents.jsonl` and the MQTT topic
-`workplace_safety/alerts`.
+## 1. See it running
 
-## 4. Architecture
-```
- USB camera / video file / RTSP
-            │
- ┌──────────▼─────────── PipeGen-generated DeepStream app (GPU, in PipeGen's container) ──┐
- │ source → nvstreammux → nvinfer [TensorRT engine: person detector] → nvtracker → OSD    │
- │        └→ per-frame JSON metadata file (or MQTT)                                        │
- └──────────┬─────────────────────────────────────────────────────────────────────────────┘
-            │  label, confidence, bbox, track_id per object
- ┌──────────▼─────────── src/incident_processor.py (CPU) ─────────────────────────────────┐
- │ metadata_adapters → person filter → bottom-centre anchor → zone_manager                │
- │ → dedup (per-track state machine / per-zone cooldown) → event_logger + mqtt_publisher  │
- └──────────┬─────────────────────────────────────────────────────────────────────────────┘
-            ▼
- data/incidents.jsonl     data/stats.json     MQTT workplace_safety/alerts
-```
-For details (execution flow, metadata contract, dedup rules), see
-[`docs/architecture.md`](docs/architecture.md).
+Real output from this repository (synthetic input, no GPU; the detections are hand-written, not model output).
 
-## 5. Main features
-- Normalised (0–1) rectangular zones that work at any resolution, validated at start-up.
-- Person filtering by label and/or class ID, plus a confidence threshold.
-- Bottom-centre anchor, so a head overlapping the zone with feet outside is not an intrusion.
-- Alert confirmed after N consecutive in-zone frames; one alert per entry per track,
-  with a re-entry cooldown. Without track IDs, a per-zone cooldown applies.
-- Two input adapters: `generic` JSON per frame, and DeepStream `nvmsgconv` minimal schema.
-- Robust input: malformed records are counted and skipped; bad objects are dropped
-  (including NaN and zero-size boxes).
-- Batch, live-follow (`--follow`, for a file the pipeline is still writing), and stdin modes.
-- Optional MQTT: if the broker is down, JSONL logging continues.
-- Helper scripts: environment check, metadata inspector, synthetic demo and verifier,
-  MQTT smoke test, evidence-based status report, and submission packager.
+**Synthetic end-to-end replay:** `bash scripts/run_synthetic_demo.sh`
 
-## 6. Directory structure
-```
-config/settings.yaml           zones, person labels, dedup timing, input format, MQTT
-config/config_nvdsanalytics.txt  the zone as a DeepStream nvdsanalytics ROI (generated)
-src/                           incident processor (no inference)
-  incident_processor.py          CLI + decision logic
-  metadata_adapters.py           generic / deepstream_minimal parsers
-  zone_manager.py                zone geometry, anchor point
-  config_loader.py               settings validation, project paths
-  event_logger.py  safety_stats.py  mqtt_publisher.py  zone_to_nvdsanalytics.py
-scripts/
-  check_environment.sh           read-only PipeGen/GPU readiness check
-  run_pipeline.sh                launches PipeGen's run.sh + the incident processor
-  run_synthetic_demo.sh          synthetic replay (no GPU)
-  verify_synthetic_demo.py       independent check of the synthetic replay
-  mqtt_smoke_test.sh             MQTT delivery test against a private local broker
-  inspect_metadata.py            inspects real PipeGen metadata: format, labels, frame size
-  make_synthetic_metadata.py     generates the synthetic stream
-  validate_project.sh            evidence-based stage status
-  package_submission.py          builds the clean submission ZIP in dist/
-tests/                         96 pytest tests
-pipegen_project/               requirement.md (Stage 1 input), README.md (PipeGen runbook),
-                               export/ (PipeGen export goes here; not created yet)
-docs/                          architecture, testing, demo script, project description,
-                               submission checklist, optimisation report
-data/                          live outputs: incidents.jsonl, stats.json (data/synthetic/ is regenerable)
-reports/evidence/              environment/, unit_tests/, synthetic_demo/, pipegen/ (empty), pipeline_runs/ (empty)
-reports/session_logs/          execution logs with full command output (raw/)
-```
-
-## 7. Prerequisites
-- **Incident processor, tests, synthetic demo:** Linux, Python ≥ 3.9 (verified with
-  3.12.3). The packages are in `requirements.txt`: PyYAML, paho-mqtt (optional), pytest.
-- **MQTT test (optional):** Mosquitto (`sudo apt install mosquitto mosquitto-clients`)
-  or a user-space copy ([`docs/testing.md`](docs/testing.md#mqtt-without-sudo)).
-- **PipeGen pipeline**, per the official setup checklist: **PipeGen v0.5.1** signed in to
-  a CraftifAI account, on x86-64 Linux with an NVIDIA GPU (or a Jetson with JetPack 6), in
-  an **X11** session, with a USB camera or video under `/home`. PipeGen runs DeepStream
-  and TensorRT **inside a Docker image** that it downloads on first launch (~12 GB). The
-  host needs the NVIDIA driver, Docker and the NVIDIA Container Toolkit. Step-by-step:
-  [`pipegen_project/README.md` §0a](pipegen_project/README.md).
-
-## 8. Installation
-```bash
-cd ~/Downloads/workplace_safety_sentinel        # or wherever the project was extracted
-unset PYTHONPATH                                 # ROS setups export one; keep it out of the venv
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-bash scripts/check_environment.sh                # read-only; PASS/FAIL against the PipeGen checklist
-```
-The scripts use `.venv/bin/python` automatically when it exists, so activating the
-venv is optional.
-
-## 9. Run the demo
-**Synthetic demo** (no GPU; replays hand-written detections, **not** model output):
-```bash
-bash scripts/run_synthetic_demo.sh
-.venv/bin/python scripts/verify_synthetic_demo.py
-bash scripts/mqtt_smoke_test.sh                  # needs Mosquitto; exit 77 = skipped
-```
-
-**Real pipeline** (after the PipeGen stages; the export is in `pipegen_project/export/`):
-```bash
-export METADATA_PATH="<JSON metadata file written by the generated app>"
-.venv/bin/python scripts/inspect_metadata.py "$METADATA_PATH"   # prints METADATA_FORMAT to use
-export METADATA_FORMAT=generic                   # or deepstream_minimal, as printed above
-SENTINEL_MQTT=1 bash scripts/run_pipeline.sh     # runs export/**/run.sh + the processor
-```
-`run_pipeline.sh` starts the processor in follow mode **before** the pipeline, launches
-the generated `run.sh` (or `$PIPEGEN_RUN_CMD`), and saves both logs to
-`reports/evidence/pipeline_runs/`. Optional overrides: `INCIDENTS_PATH`, `STATS_PATH`,
-`EVIDENCE_DIR`, and `IDLE_EXIT` (default 10 s).
-
-**Processor only:**
-```bash
-.venv/bin/python src/incident_processor.py --input meta.jsonl            # batch
-.venv/bin/python src/incident_processor.py --input meta.jsonl --follow   # live tail
-mosquitto_sub -t '<pipegen topic>' | .venv/bin/python src/incident_processor.py --input - --format deepstream_minimal
-```
-
-## 10. Run the tests
-```bash
-.venv/bin/python -m pytest -q          # 96 tests
-bash scripts/validate_project.sh       # tests + evidence-based status of every stage
-```
-The tests verify the incident-processing component and the hand-off script (with a stub
-in place of PipeGen). They say **nothing** about PipeGen, TensorRT, or live video.
-Methodology: [`docs/testing.md`](docs/testing.md).
-
-## 11. Expected output and how to read it
-The synthetic demo prints (timestamps differ):
-```
+```text
 wrote 80 SYNTHETIC frames to data/synthetic/metadata_synthetic.jsonl
 ... WARNING sentinel: ALERT incident_0001: person track 1 entered restricted_zone_1 (conf=0.88)
 ... INFO sentinel: done: 80 frames, 160 person detections, 1 incidents, 2 unique tracks, 0 malformed
 ```
-In this scenario, track 1 walks into the zone (feet inside from frame 49; confirmed on
-frame 51). Track 2 stays outside, and a forklift sits inside the zone. Exactly one
-incident is correct. `verify_synthetic_demo.py` recomputes this independently and
-prints `16/16 checks passed`.
 
-One incident record (`*.jsonl`, one JSON object per line):
+Track 1 walks into the zone (feet inside from frame 49; confirmed on frame 51). Track 2 stays outside, and a forklift sits inside the zone. Exactly one incident is correct.
+
+**Independent verification:** `.venv/bin/python scripts/verify_synthetic_demo.py` → `16/16 checks passed`
+
+**Unit tests:** `.venv/bin/python -m pytest -q` → `96 passed`
+
+**MQTT alert delivered** to a real Mosquitto 2.0.18 broker and an independent subscriber (`bash scripts/mqtt_smoke_test.sh`; log in `reports/evidence/synthetic_demo/mqtt_smoke_test_output.txt`).
+
+**The incident record produced:**
+
 ```json
 {"event_id":"incident_0001","event_type":"restricted_zone_intrusion","object_class":"person",
  "zone_id":"restricted_zone_1","timestamp":"2026-01-01T00:00:05.100000+00:00","confidence":0.88,
@@ -182,92 +47,246 @@ One incident record (`*.jsonl`, one JSON object per line):
  "bbox_norm":[0.5823,0.3519,0.6552,0.7222],"dedup_method":"track","input_format":"generic",
  "processed_at":"2026-10-16T16:20:02.261+00:00"}
 ```
-- `timestamp` is the frame time from the metadata (or the processing time if absent);
-  `processed_at` is when the processor handled it.
+
+**Live pipeline run (camera → PipeGen → alerts):** ⏳ *Pending. Add a screenshot or recording here after the first `run_pipeline.sh` run, e.g.* `![Live run](docs/images/live_run.png)`. Logs are saved automatically to `reports/evidence/pipeline_runs/`.
+
+## 2. Pipeline IR node graph
+
+⏳ **Pending.** The Pipeline IR is generated by PipeGen (Stage 2). It has not been produced yet because PipeGen could not be installed on the target laptop (see [§15](#15-pipegen--tensorrt--gpu-status)).
+
+Planned graph:
+
+```text
+source (USB cam / file / RTSP) → nvstreammux → nvinfer [TensorRT person detector] → nvtracker → nvdsosd
+                                                                              └→ per-frame JSON metadata → incident processor
+```
+
+To add it: open the project in PipeGen, take a screenshot of the node graph, save it as `docs/images/pipeline_ir_graph.png`, and replace this note with:
+
+```markdown
+![Pipeline IR node graph](docs/images/pipeline_ir_graph.png)
+```
+
+## 3. PipeGen Export Project
+
+⏳ **Pending.** The export folder goes in `pipegen_project/export/` (currently empty). Stage 1 input is in `pipegen_project/requirement.md`; the PipeGen runbook is `pipegen_project/README.md`.
+
+After exporting from PipeGen into `pipegen_project/export/`, run it together with the incident processor:
+
+```bash
+SENTINEL_MQTT=1 bash scripts/run_pipeline.sh   # runs export/**/run.sh + the processor
+```
+
+## 4. Quick start
+
+```bash
+cd ~/Downloads/workplace_safety_sentinel        # or wherever the project was extracted
+unset PYTHONPATH                                # ROS setups export one; keep it out of the venv
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+bash scripts/check_environment.sh               # read-only; PASS/FAIL against the PipeGen checklist
+
+# Synthetic demo (no GPU)
+bash scripts/run_synthetic_demo.sh
+.venv/bin/python scripts/verify_synthetic_demo.py
+bash scripts/mqtt_smoke_test.sh                 # needs Mosquitto; exit 77 = skipped
+
+# Tests
+.venv/bin/python -m pytest -q                   # 96 tests
+```
+
+The scripts use `.venv/bin/python` automatically when it exists, so activating the venv is optional. Full details: [§9 Run the demo](#9-run-the-demo).
+
+---
+
+## 5. Overview
+
+| Layer | Runs on | Implemented by |
+|---|---|---|
+| Perception: camera → person detector (TensorRT) → tracker → metadata | NVIDIA GPU / Jetson | PipeGen-generated DeepStream app (`pipegen_project/`) |
+| Decision: person filter, zone test, de-duplication, statistics | CPU | `src/incident_processor.py` |
+| Action: JSONL incident log, MQTT alert | CPU | `src/event_logger.py`, `src/mqtt_publisher.py` |
+
+The Python code does no inference. All perception comes from PipeGen.
+
+**Problem.** Workers walk into robot cells, press lines, or chemical benches without anyone noticing. CCTV is passive: violations surface only after an incident.
+
+**Solution.** A PipeGen pipeline detects and tracks people. For every tracked person, the incident processor takes the bottom-centre of the bounding box (an approximation of where the feet touch the floor). It tests that point against configurable restricted zones. It raises one alert per entry, confirmed over several frames and de-duplicated per track, to `data/incidents.jsonl` and the MQTT topic `workplace_safety/alerts`.
+
+## 6. Architecture
+
+```text
+              USB camera / video file / RTSP
+                         │
+┌──────────▼─────────── PipeGen-generated DeepStream app (GPU, in PipeGen's container) ──┐
+│ source → nvstreammux → nvinfer [TensorRT engine: person detector] → nvtracker → OSD    │
+│                                    └→ per-frame JSON metadata file (or MQTT)           │
+└──────────┬─────────────────────────────────────────────────────────────────────────────┘
+           │ label, confidence, bbox, track_id per object
+┌──────────▼─────────── src/incident_processor.py (CPU) ─────────────────────────────────┐
+│ metadata_adapters → person filter → bottom-centre anchor → zone_manager                │
+│ → dedup (per-track state machine / per-zone cooldown) → event_logger + mqtt_publisher  │
+└──────────┬─────────────────────────────────────────────────────────────────────────────┘
+           ▼
+ data/incidents.jsonl     data/stats.json     MQTT workplace_safety/alerts
+```
+
+For details (execution flow, metadata contract, dedup rules), see `docs/architecture.md`.
+
+## 7. Main features
+
+- Normalised (0–1) rectangular zones that work at any resolution, validated at start-up.
+- Person filtering by label and/or class ID, plus a confidence threshold.
+- Bottom-centre anchor, so a head overlapping the zone with feet outside is not an intrusion.
+- Alert confirmed after N consecutive in-zone frames; one alert per entry per track, with a re-entry cooldown. Without track IDs, a per-zone cooldown applies.
+- Two input adapters: generic JSON per frame, and DeepStream nvmsgconv minimal schema.
+- Robust input: malformed records are counted and skipped; bad objects are dropped (including NaN and zero-size boxes).
+- Batch, live-follow (`--follow`, for a file the pipeline is still writing), and stdin modes.
+- Optional MQTT: if the broker is down, JSONL logging continues.
+- Helper scripts: environment check, metadata inspector, synthetic demo and verifier, MQTT smoke test, evidence-based status report, and submission packager.
+
+## 8. Directory structure
+
+```text
+config/settings.yaml               zones, person labels, dedup timing, input format, MQTT
+config/config_nvdsanalytics.txt    the zone as a DeepStream nvdsanalytics ROI (generated)
+src/                               incident processor (no inference)
+  incident_processor.py            CLI + decision logic
+  metadata_adapters.py             generic / deepstream_minimal parsers
+  zone_manager.py                  zone geometry, anchor point
+  config_loader.py                 settings validation, project paths
+  event_logger.py  safety_stats.py  mqtt_publisher.py  zone_to_nvdsanalytics.py
+scripts/
+  check_environment.sh             read-only PipeGen/GPU readiness check
+  run_pipeline.sh                  launches PipeGen's run.sh + the incident processor
+  run_synthetic_demo.sh            synthetic replay (no GPU)
+  verify_synthetic_demo.py         independent check of the synthetic replay
+  mqtt_smoke_test.sh               MQTT delivery test against a private local broker
+  inspect_metadata.py              inspects real PipeGen metadata: format, labels, frame size
+  make_synthetic_metadata.py       generates the synthetic stream
+  validate_project.sh              evidence-based stage status
+  package_submission.py            builds the clean submission ZIP in dist/
+tests/                             96 pytest tests
+pipegen_project/                   requirement.md (Stage 1 input), README.md (PipeGen runbook),
+                                   export/ (PipeGen export goes here; not created yet)
+docs/                              architecture, testing, demo script, project description,
+                                   submission checklist, optimisation report
+data/                              live outputs: incidents.jsonl, stats.json (data/synthetic/ is regenerable)
+reports/evidence/                  environment/, unit_tests/, synthetic_demo/, pipegen/ (empty), pipeline_runs/ (empty)
+reports/session_logs/              execution logs with full command output (raw/)
+```
+
+## 9. Run the demo
+
+**Prerequisites.**
+- Incident processor, tests, synthetic demo: Linux, Python ≥ 3.9 (verified with 3.12.3). Packages are in `requirements.txt`: PyYAML, paho-mqtt (optional), pytest.
+- MQTT test (optional): Mosquitto (`sudo apt install mosquitto mosquitto-clients`) or a user-space copy (`docs/testing.md`).
+- PipeGen pipeline, per the official setup checklist: PipeGen v0.5.1 signed in to a CraftifAI account, on x86-64 Linux with an NVIDIA GPU (or a Jetson with JetPack 6), in an X11 session, with a USB camera or video under `/home`. PipeGen runs DeepStream and TensorRT inside a Docker image that it downloads on first launch (~12 GB). The host needs the NVIDIA driver, Docker and the NVIDIA Container Toolkit. Step-by-step: `pipegen_project/README.md` §0a.
+
+**Real pipeline** (after the PipeGen stages; the export is in `pipegen_project/export/`):
+
+```bash
+export METADATA_PATH="<JSON metadata file written by the generated app>"
+.venv/bin/python scripts/inspect_metadata.py "$METADATA_PATH"   # prints METADATA_FORMAT to use
+export METADATA_FORMAT=generic                                  # or deepstream_minimal, as printed above
+SENTINEL_MQTT=1 bash scripts/run_pipeline.sh                    # runs export/**/run.sh + the processor
+```
+
+`run_pipeline.sh` starts the processor in follow mode before the pipeline, launches the generated `run.sh` (or `$PIPEGEN_RUN_CMD`), and saves both logs to `reports/evidence/pipeline_runs/`. Optional overrides: `INCIDENTS_PATH`, `STATS_PATH`, `EVIDENCE_DIR`, and `IDLE_EXIT` (default 10 s).
+
+**Processor only:**
+
+```bash
+.venv/bin/python src/incident_processor.py --input meta.jsonl            # batch
+.venv/bin/python src/incident_processor.py --input meta.jsonl --follow   # live tail
+mosquitto_sub -t '<pipegen topic>' | .venv/bin/python src/incident_processor.py --input - --format deepstream_minimal
+```
+
+## 10. Run the tests
+
+```bash
+.venv/bin/python -m pytest -q        # 96 tests
+bash scripts/validate_project.sh     # tests + evidence-based status of every stage
+```
+
+The tests verify the incident-processing component and the hand-off script (with a stub in place of PipeGen). They say nothing about PipeGen, TensorRT, or live video. Methodology: `docs/testing.md`.
+
+## 11. Reading the output
+
+- `timestamp` is the frame time from the metadata (or the processing time if absent); `processed_at` is when the processor handled it.
 - `anchor_point` is the normalised feet position that was tested against the zone.
 - `dedup_method`: `track` (per-track state machine) or `zone_cooldown` (no track IDs).
 - `confidence` is `null` when the input schema carries none.
 
-`stats.json`: `frames_processed`, `total_detections` (person detections summed over
-frames), `current_people`, `unique_tracked_people` (`null` without tracking),
-`incidents_total`, `incidents_by_zone`, `last_incident_timestamp`, `malformed_records`.
+`stats.json`: `frames_processed`, `total_detections` (person detections summed over frames), `current_people`, `unique_tracked_people` (null without tracking), `incidents_total`, `incidents_by_zone`, `last_incident_timestamp`, `malformed_records`.
 
 ## 12. Configuration (`config/settings.yaml`)
-- `zones`: rectangles in **normalised** coordinates; the boundary counts as inside.
-  Invalid zones stop the processor with a clear error.
-- `detection.person_labels` / `person_class_ids`: set these from the label file of the
-  model selected in PipeGen (label matching is case-insensitive). Also
-  `min_confidence`, `accept_missing_confidence`, and `anchor` (`bottom_center` | `center`).
-- `incidents`: `confirm_frames` (3), `cooldown_seconds` (10), `track_timeout_seconds` (5),
-  output paths (relative to the project root).
-- `input.format`: `generic` | `deepstream_minimal`. `input.frame_width/height` must equal
-  the **nvstreammux** resolution when the metadata has no frame size.
-- `mqtt`: `enabled`, `host`, `port`, `topic` (no wildcards), `qos`, `client_id`. Off by
-  default; `--mqtt` or `SENTINEL_MQTT=1` turns it on.
-- To draw the zone in the pipeline's OSD:
-  `.venv/bin/python src/zone_to_nvdsanalytics.py --width <W> --height <H>`.
+
+- `zones`: rectangles in normalised coordinates; the boundary counts as inside. Invalid zones stop the processor with a clear error.
+- `detection.person_labels` / `person_class_ids`: set these from the label file of the model selected in PipeGen (label matching is case-insensitive). Also `min_confidence`, `accept_missing_confidence`, and `anchor` (`bottom_center` | `center`).
+- `incidents`: `confirm_frames` (3), `cooldown_seconds` (10), `track_timeout_seconds` (5), output paths (relative to the project root).
+- `input.format`: `generic` | `deepstream_minimal`. `input.frame_width/height` must equal the nvstreammux resolution when the metadata has no frame size.
+- `mqtt`: `enabled`, `host`, `port`, `topic` (no wildcards), `qos`, `client_id`. Off by default; `--mqtt` or `SENTINEL_MQTT=1` turns it on.
+- To draw the zone in the pipeline's OSD: `.venv/bin/python src/zone_to_nvdsanalytics.py --width <W> --height <H>`.
 
 ## 13. Current implementation status
-Verified on the target laptop (Lenovo LOQ 15IRX10, Ubuntu 24.04.4, i7-14700HX,
-NVIDIA GPU PCI `10de:2d59`) on 2026-10-16.
+
+Verified on the target laptop (Lenovo LOQ 15IRX10, Ubuntu 24.04.4, i7-14700HX, NVIDIA GPU PCI 10de:2d59) on 2026-10-16.
 
 | Component | Status | Evidence |
-| --- | --- | --- |
-| Incident processor (zones, dedup, stats, JSONL, adapters, validation) | Implemented; **96 tests pass** | `reports/evidence/unit_tests/` |
-| Synthetic end-to-end replay | **Passes** with synthetic input (16/16 independent checks) | `reports/evidence/synthetic_demo/` |
-| MQTT alerts | **Delivered** to a real Mosquitto 2.0.18 broker and an independent subscriber, with synthetic input | `reports/evidence/synthetic_demo/mqtt_smoke_test_output.txt` |
-| `run_pipeline.sh` hand-off | Tested with a **stub** in place of PipeGen | `tests/test_run_pipeline.py` |
-| PipeGen stages 1–5 | **Not run** (blocked) | `docs/submission_checklist.md` |
-| TensorRT engine and speed report | **Do not exist** | — |
-| Live camera / video through the pipeline | **Not run.** The integrated webcam streams 1280x720 at ~29 fps at the V4L2 level only | `reports/session_logs/raw/env_14_webcam_stream.log` |
+|---|---|---|
+| Incident processor (zones, dedup, stats, JSONL, adapters, validation) | Implemented; 96 tests pass | `reports/evidence/unit_tests/` |
+| Synthetic end-to-end replay | Passes with synthetic input (16/16 independent checks) | `reports/evidence/synthetic_demo/` |
+| MQTT alerts | Delivered to a real Mosquitto 2.0.18 broker and an independent subscriber, with synthetic input | `reports/evidence/synthetic_demo/mqtt_smoke_test_output.txt` |
+| `run_pipeline.sh` hand-off | Tested with a stub in place of PipeGen | `tests/test_run_pipeline.py` |
+| PipeGen stages 1–5 | Not run (blocked) | `docs/submission_checklist.md` |
+| TensorRT engine and speed report | Do not exist yet | — |
+| Live camera / video through the pipeline | Not run. The integrated webcam streams 1280x720 at ~29 fps at the V4L2 level only | `reports/session_logs/raw/env_14_webcam_stream.log` |
 
 ## 14. Known limitations
-- Zones are axis-aligned rectangles. The bottom-centre anchor assumes a side or oblique
-  camera view, and occluded feet delay detection.
+
+- Zones are axis-aligned rectangles. The bottom-centre anchor assumes a side or oblique camera view, and occluded feet delay detection.
 - Without track IDs, two people entering one zone within the cooldown produce one alert.
-- The real PipeGen metadata schema has not been seen yet. The adapters follow the
-  documented contract and DeepStream's nvmsgconv minimal schema; run
-  `scripts/inspect_metadata.py` on the first real file.
+- The real PipeGen metadata schema has not been seen yet. The adapters follow the documented contract and DeepStream's nvmsgconv minimal schema; run `scripts/inspect_metadata.py` on the first real file.
 - MQTT is plain TCP without authentication or TLS (suitable for a local broker only).
 - The laptop's camera is the integrated webcam, not the kit's USB camera.
 
 ## 15. PipeGen / TensorRT / GPU status
-Checked on the laptop on 2026-10-16 (`reports/session_logs/environment_report.md`):
-- **NVIDIA driver: not installed.** The GPU is bound to `nouveau`; there is no `nvidia-smi`.
-- **PipeGen: not installed.** The official `.deb` and prerequisites script need a portal
-  sign-in to download. The unrelated PyPI package `pipegen` is **not** used.
-- **Docker / NVIDIA Container Toolkit: not installed.** **Session: Wayland** (X11 is required).
-- Therefore: **no Pipeline IR, no model selection, no TensorRT engine, no speed report, no
-  live run, and no live incidents exist.** None have been fabricated.
 
-The exact remaining steps (driver, download, prerequisites, `.deb`, X11, first launch,
-then the five PipeGen stages) are in [`pipegen_project/README.md` §0a](pipegen_project/README.md)
-and [`docs/submission_checklist.md`](docs/submission_checklist.md).
+Checked on the laptop on 2026-10-16 (`reports/session_logs/environment_report.md`):
+
+- NVIDIA driver: not installed. The GPU is bound to nouveau; there is no `nvidia-smi`.
+- PipeGen: not installed. The official .deb and prerequisites script need a portal sign-in to download. The unrelated PyPI package `pipegen` is not used.
+- Docker / NVIDIA Container Toolkit: not installed. Session: Wayland (X11 is required).
+
+Therefore: no Pipeline IR, no model selection, no TensorRT engine, no speed report, no live run, and no live incidents exist yet. None have been fabricated.
+
+The exact remaining steps (driver, download, prerequisites, .deb, X11, first launch, then the five PipeGen stages) are in `pipegen_project/README.md` §0a and `docs/submission_checklist.md`.
 
 ## 16. Reproducing the results
+
 ```bash
 unset PYTHONPATH && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q                                   # 96 passed
+.venv/bin/python -m pytest -q                                                       # 96 passed
 bash scripts/run_synthetic_demo.sh && .venv/bin/python scripts/verify_synthetic_demo.py   # 16/16
-bash scripts/mqtt_smoke_test.sh                                 # PASS, or exit 77 without Mosquitto
-bash scripts/validate_project.sh                                # PipeGen stages: NOT VERIFIED
-.venv/bin/python scripts/package_submission.py                  # dist/*.zip
+bash scripts/mqtt_smoke_test.sh                                                     # PASS, or exit 77 without Mosquitto
+bash scripts/validate_project.sh                                                    # PipeGen stages: NOT VERIFIED
+.venv/bin/python scripts/package_submission.py                                      # dist/*.zip
 ```
-The synthetic metadata is deterministic. `data/synthetic/metadata_synthetic.jsonl` has
-SHA-256 `ec61cd07b9751ddeadcfbc636b351e50ded2f32f555fcf1f1fb0ee39bcec4801`.
 
-### Troubleshooting
+The synthetic metadata is deterministic. `data/synthetic/metadata_synthetic.jsonl` has SHA-256 `ec61cd07b9751ddeadcfbc636b351e50ded2f32f555fcf1f1fb0ee39bcec4801`.
+
+## Troubleshooting
+
 | Symptom | Fix |
-| --- | --- |
-| `pipegen: command not found` | Install CraftifAI PipeGen from the portal. `pip install pipegen` is an **unrelated** tool |
+|---|---|
+| `pipegen: command not found` | Install CraftifAI PipeGen from the portal. `pip install pipegen` is an unrelated tool |
 | `nvidia-smi: command not found`, `Kernel driver in use: nouveau` | `sudo apt install nvidia-driver-595-open && sudo reboot` |
 | Odd imports after `source /opt/ros/...` | `unset PYTHONPATH`; use `.venv` |
-| `no run.sh under pipegen_project/export/` | Export the PipeGen project there, or set `PIPEGEN_RUN_CMD` |
+| no `run.sh` under `pipegen_project/export/` | Export the PipeGen project there, or set `PIPEGEN_RUN_CMD` |
 | No incidents | `inspect_metadata.py`: check the person label, track IDs, and frame size; the zone must cover where the feet appear |
 | Too many incidents | No track IDs: enable the tracker or raise `cooldown_seconds` |
 | `MQTT broker ... unavailable` | Start Mosquitto; JSONL logging continues regardless |
 | `metadata file never appeared` | `METADATA_PATH` does not match the path the pipeline writes to |
 
-Submission form: https://forms.gle/eJyeCKCG2UH757QZ8 (deadline 4:00 pm). The submission
-must include the PipeGen export folder, the Pipeline IR graph screenshot, and the
-TensorRT speed-report screenshot.
+Submission form: https://forms.gle/eJyeCKCG2UH757QZ8 (deadline 4:00 pm). The submission must include the PipeGen export folder, the Pipeline IR graph screenshot, and the TensorRT speed-report screenshot.
